@@ -3,31 +3,39 @@ package com.example.quotesyouneed
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.background
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.quotesyouneed.ui.theme.QuotesYouNeedTheme
+import androidx.compose.ui.res.painterResource
+// Testing Glide
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.AlignmentLine
+import androidx.compose.ui.layout.FirstBaseline
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Dp
+import com.google.accompanist.glide.rememberGlidePainter
+import kotlinx.coroutines.launch
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             MyApp {
-                MyScreenContent()
+                ImageList()
             }
         }
     }
@@ -36,64 +44,75 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MyApp(content: @Composable () -> Unit) {
     QuotesYouNeedTheme {
-        Surface(color = Color.Red) { // Applies this colour scheme to the entire app.
-            MyScreenContent()
-        }
-    }
-}
-
-// isSelected state, initialised with 'remember' to false, add click handler to toggle state.
-@Composable
-fun Greeting(name: String, isSelected: Boolean, updateState: (Boolean) -> Unit) {
-    // Logic for colour change on click.
-    val bool: Boolean
-    bool = if(isSelected) isSelected else false
-
-    val backgroundColor by animateColorAsState(if (isSelected) Color.White else Color.Transparent)
-    // Logic for observing click.
-    Text(text = "Hello There! $name!",
-         modifier = Modifier
-                    .padding(24.dp)
-                    .background(color = backgroundColor)
-                    .clickable(onClick = { updateState(!isSelected) }),style = MaterialTheme.typography.body1)
-}
-
-@Composable
-fun NameList(names: List<String>, modifier: Modifier = Modifier) {
-    var isSelected by remember { mutableStateOf(false)}
-
-    LazyColumn(modifier = modifier
-        .padding(16.dp)
-        .background(MaterialTheme.colors.surface)) { // Passing in modifier.
-        items(items = names) { name -> // For each name in input String list.
-            Greeting(name = name, isSelected = isSelected, updateState = { newState -> isSelected = newState })
-            Divider(color = Color.Black)
+        Surface { // Applies this colour scheme to the entire app.
+            ImageList()
         }
     }
 }
 
 @Composable
-fun MyScreenContent(names: List<String> = List(1000) { "#$it" }) {
-    val counterState = remember { mutableStateOf(0)}
-    Column(modifier = Modifier.fillMaxHeight()) {
-        Column(modifier = Modifier.weight(1f)) { // Making it flexible. Stretching out screen.
-            NameList(names)
-        }
-        Divider(color = Color.Transparent, thickness = 32.dp)
-        Counter(
-            count = counterState.value,
-            updateCount = { newCount -> counterState.value = newCount }
-        )
+fun ImageListItem(index: Int) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+         Image(painter = rememberGlidePainter(request = "https://st.automobilemag.com/uploads/sites/5/2018/09/2020-Tesla-Roadster-white-on-Grand-Basel-show-floor.jpg"), contentDescription = "Boobs", modifier = Modifier.size(50.dp))
+//        Image(painter = painterResource(id = R.drawable.tesla), contentDescription = "White Tesla", modifier = Modifier.size(50.dp))
+        Spacer(Modifier.width(10.dp))
+        Text("Tesla #$index", style = MaterialTheme.typography.subtitle1)
+
     }
 }
 
 @Composable
-fun Counter(count: Int, updateCount: (Int) -> Unit) {
-    Button(onClick = { updateCount(count+1) },
-        Modifier.padding(12.dp),
-        colors = ButtonDefaults.buttonColors(  // Changes color of button after (x) amount of clicks.
-            backgroundColor = if (count > 5 ) Color.Yellow else Color.White)) {
-        Text("I've been clicked $count times")
+fun ImageList() {
+    val scrollState = rememberLazyListState()
+    val listSize = 50
+    val coroutineScope = rememberCoroutineScope() // Save C scope where animated scroll is executed.
+    Column() {
+        Row(modifier = Modifier.padding(12.dp)) {
+            Button(onClick = {
+                coroutineScope.launch {
+                    scrollState.animateScrollToItem(0)
+                }
+            }) {
+                Text("Top")
+            }
+            Spacer(Modifier.width(10.dp))
+            Button(onClick = {
+                coroutineScope.launch {
+                    scrollState.animateScrollToItem(listSize-1)
+                }
+            }) {
+                Text("Bottom")
+            }
+
+        }
+
+        LazyColumn(state = scrollState) {
+            items(50) {
+                ImageListItem(it)
+            }
+        }
     }
 }
 
+fun random() {
+
+}
+// Can only measure your children once.
+fun Modifier.firstBaselineToTop(
+    firstBaseLineToTop: Dp
+) = this.then(
+    layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints) // Measure composable.
+        // Check for composables first base line.
+        check(placeable[FirstBaseline] != AlignmentLine.Unspecified)
+        val firstBaseline = placeable[FirstBaseline]
+
+        // Height including padding of composable first baseline.
+        val placeableY = firstBaseLineToTop.roundToPx() - firstBaseline
+        val height = placeable.height + placeableY
+        layout(placeable.width, height) {
+            // Position on screen. Have to use placeRelative or it won't be shown.
+            placeable.placeRelative(0, placeableY)
+        }
+    }
+)
