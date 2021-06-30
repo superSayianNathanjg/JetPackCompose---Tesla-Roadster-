@@ -22,97 +22,149 @@ import com.example.quotesyouneed.ui.theme.QuotesYouNeedTheme
 import androidx.compose.ui.res.painterResource
 // Testing Glide
 import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.AlignmentLine
 import androidx.compose.ui.layout.FirstBaseline
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
 import com.google.accompanist.glide.rememberGlidePainter
 import kotlinx.coroutines.launch
-
+import kotlin.math.max
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MyApp {
-                ImageList()
-            }
+            LayoutsCodelab()
         }
     }
 }
 
-@Composable
-fun MyApp(content: @Composable () -> Unit) {
-    QuotesYouNeedTheme {
-        Surface { // Applies this colour scheme to the entire app.
-            ImageList()
-        }
-    }
-}
-
-@Composable
-fun ImageListItem(index: Int) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-         Image(painter = rememberGlidePainter(request = "https://st.automobilemag.com/uploads/sites/5/2018/09/2020-Tesla-Roadster-white-on-Grand-Basel-show-floor.jpg"), contentDescription = "Boobs", modifier = Modifier.size(50.dp))
-//        Image(painter = painterResource(id = R.drawable.tesla), contentDescription = "White Tesla", modifier = Modifier.size(50.dp))
-        Spacer(Modifier.width(10.dp))
-        Text("Tesla #$index", style = MaterialTheme.typography.subtitle1)
-
-    }
-}
-
-@Composable
-fun ImageList() {
-    val scrollState = rememberLazyListState()
-    val listSize = 50
-    val coroutineScope = rememberCoroutineScope() // Save C scope where animated scroll is executed.
-    Column() {
-        Row(modifier = Modifier.padding(12.dp)) {
-            Button(onClick = {
-                coroutineScope.launch {
-                    scrollState.animateScrollToItem(0)
-                }
-            }) {
-                Text("Top")
-            }
-            Spacer(Modifier.width(10.dp))
-            Button(onClick = {
-                coroutineScope.launch {
-                    scrollState.animateScrollToItem(listSize-1)
-                }
-            }) {
-                Text("Bottom")
-            }
-
-        }
-
-        LazyColumn(state = scrollState) {
-            items(50) {
-                ImageListItem(it)
-            }
-        }
-    }
-}
-
-fun random() {
-
-}
-// Can only measure your children once.
-fun Modifier.firstBaselineToTop(
-    firstBaseLineToTop: Dp
-) = this.then(
-    layout { measurable, constraints ->
-        val placeable = measurable.measure(constraints) // Measure composable.
-        // Check for composables first base line.
-        check(placeable[FirstBaseline] != AlignmentLine.Unspecified)
-        val firstBaseline = placeable[FirstBaseline]
-
-        // Height including padding of composable first baseline.
-        val placeableY = firstBaseLineToTop.roundToPx() - firstBaseline
-        val height = placeable.height + placeableY
-        layout(placeable.width, height) {
-            // Position on screen. Have to use placeRelative or it won't be shown.
-            placeable.placeRelative(0, placeableY)
-        }
-    }
+val topics = listOf(
+    "Arts & Crafts", "Beauty", "Books", "Business", "Comics", "Culinary",
+    "Design", "Fashion", "Film", "History", "Maths", "Music", "People", "Philosophy",
+    "Religion", "Social sciences", "Technology", "TV", "Writing"
 )
+
+@Composable
+fun LayoutsCodelab() {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(text = "List of Stuff")
+                },
+                actions = {
+                    IconButton(onClick = { /* doSomething() */ }) {
+                        Icon(Icons.Filled.ElectricCar, contentDescription = null)
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        BodyContent(Modifier.padding(innerPadding))
+    }
+}
+
+@Composable
+fun BodyContent(modifier: Modifier = Modifier) {
+    Row(modifier = modifier
+        .background(color = Color.LightGray)
+        .padding(16.dp)
+        .size(200.dp)
+        .horizontalScroll(rememberScrollState()),
+        content = {
+            StaggeredGrid {
+                for (topic in topics) {
+                    Chip(modifier = Modifier.padding(8.dp), text = topic)
+                }
+            }
+        })
+}
+
+@Composable
+fun StaggeredGrid(
+    modifier: Modifier = Modifier,
+    rows: Int = 3,
+    content: @Composable () -> Unit
+) {
+    Layout(
+        modifier = modifier,
+        content = content
+    ) { measurables, constraints ->
+
+        // Keep track of the width of each row
+        val rowWidths = IntArray(rows) { 0 }
+
+        // Keep track of the max height of each row
+        val rowHeights = IntArray(rows) { 0 }
+
+        // Don't constrain child views further, measure them with given constraints
+        // List of measured children
+        val placeables = measurables.mapIndexed { index, measurable ->
+            // Measure each child
+            val placeable = measurable.measure(constraints)
+
+            // Track the width and max height of each row
+            val row = index % rows
+            rowWidths[row] += placeable.width
+            rowHeights[row] = max(rowHeights[row], placeable.height)
+
+            placeable
+        }
+
+        // Grid's width is the widest row
+        val width = rowWidths.maxOrNull()
+            ?.coerceIn(constraints.minWidth.rangeTo(constraints.maxWidth)) ?: constraints.minWidth
+
+        // Grid's height is the sum of the tallest element of each row
+        // coerced to the height constraints
+        val height = rowHeights.sumOf { it }
+            .coerceIn(constraints.minHeight.rangeTo(constraints.maxHeight))
+
+        // Y of each row, based on the height accumulation of previous rows
+        val rowY = IntArray(rows) { 0 }
+        for (i in 1 until rows) {
+            rowY[i] = rowY[i - 1] + rowHeights[i - 1]
+        }
+
+        // Set the size of the parent layout
+        layout(width, height) {
+            // x co-ord we have placed up to, per row
+            val rowX = IntArray(rows) { 0 }
+
+            placeables.forEachIndexed { index, placeable ->
+                val row = index % rows
+                placeable.placeRelative(
+                    x = rowX[row],
+                    y = rowY[row]
+                )
+                rowX[row] += placeable.width
+            }
+        }
+    }
+}
+
+@Composable
+fun Chip(modifier: Modifier = Modifier, text: String) {
+    Card(
+        modifier = modifier,
+        border = BorderStroke(color = Color.Black, width = Dp.Hairline),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 8.dp, top = 4.dp, end = 8.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(16.dp, 16.dp)
+                    .background(color = MaterialTheme.colors.secondary)
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(text = text)
+        }
+    }
+}
+
